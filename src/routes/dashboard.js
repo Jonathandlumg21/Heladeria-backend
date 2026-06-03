@@ -133,4 +133,34 @@ router.get('/productos-mas-vendidos', verificarToken, soloRoles('admin'), async 
   }
 });
 
+// GET /api/dashboard/ventas-por-metodo?periodo=dia|semana|mes|año
+router.get('/ventas-por-metodo', verificarToken, soloRoles('admin'), async (req, res) => {
+  const { periodo = 'dia' } = req.query;
+
+  const filtros = {
+    dia:    `DATE(fecha) = CURRENT_DATE`,
+    semana: `fecha >= DATE_TRUNC('week',  NOW())`,
+    mes:    `fecha >= DATE_TRUNC('month', NOW())`,
+    año:    `fecha >= DATE_TRUNC('year',  NOW())`,
+  };
+
+  const where = filtros[periodo] || filtros['dia'];
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        metodo_pago                   AS metodo,
+        COALESCE(SUM(total), 0)::numeric AS total,
+        COUNT(*)::int                 AS cantidad
+      FROM ventas
+      WHERE ${where}
+      GROUP BY metodo_pago
+      ORDER BY metodo_pago
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
