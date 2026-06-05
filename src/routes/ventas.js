@@ -122,6 +122,34 @@ router.get('/', verificarToken, soloRoles('admin'), async (req, res) => {
   }
 });
 
+// GET /api/ventas/reporte?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&metodo=
+router.get('/reporte', verificarToken, soloRoles('admin'), async (req, res) => {
+  const { desde, hasta, metodo } = req.query;
+  const params = [desde || '2000-01-01', hasta || new Date().toISOString().slice(0,10)];
+  let metodoFiltro = '';
+  if (metodo && ['efectivo','tarjeta','fri'].includes(metodo)) {
+    params.push(metodo);
+    metodoFiltro = `AND v.metodo_pago = $${params.length}`;
+  }
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        v.id, v.fecha, v.total::numeric, v.metodo_pago,
+        u.nombre AS vendedor,
+        (SELECT COUNT(*) FROM detalle_ventas dv WHERE dv.venta_id = v.id)::int AS num_items
+      FROM ventas v
+      JOIN usuarios u ON u.id = v.usuario_id
+      WHERE v.fecha::date >= $1::date
+        AND v.fecha::date <= $2::date
+        ${metodoFiltro}
+      ORDER BY v.fecha DESC
+    `, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/ventas/:id — detalle de una venta (solo admin)
 router.get('/:id', verificarToken, soloRoles('admin'), async (req, res) => {
   try {
