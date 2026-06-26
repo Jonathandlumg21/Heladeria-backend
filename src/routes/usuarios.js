@@ -15,11 +15,39 @@ router.get('/', verificarToken, soloRoles('admin'), async (req, res) => {
   }
 });
 
-// GET /api/usuarios/categorias — listar categorías (para formularios)
+// GET /api/usuarios/categorias — listar categorías
 router.get('/categorias', verificarToken, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM categorias ORDER BY nombre');
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/usuarios/categorias — crear categoría (solo admin)
+router.post('/categorias', verificarToken, soloRoles('admin'), async (req, res) => {
+  const { nombre } = req.body;
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ error: 'El nombre es requerido' });
+  }
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO categorias (nombre) VALUES ($1) RETURNING *',
+      [nombre.trim()]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ya existe una categoría con ese nombre' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/usuarios/categorias/:id — eliminar categoría (solo admin)
+router.delete('/categorias/:id', verificarToken, soloRoles('admin'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM categorias WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
