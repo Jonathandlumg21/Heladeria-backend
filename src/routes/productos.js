@@ -82,7 +82,7 @@ router.post('/', verificarToken, soloRoles('admin'),
     if (!nombre || !precio) {
       return res.status(400).json({ error: 'Nombre y precio son requeridos' });
     }
-    const imagen_url = req.file ? `/uploads/${req.file.filename}` : null;
+    const imagen_url = req.file ? req.file.path : null;
     const { rows } = await pool.query(`
       INSERT INTO productos
         (nombre, precio, stock, stock_minimo, unidad, imagen_url, tipo, categoria_id)
@@ -128,7 +128,7 @@ router.patch('/:id/imagen', verificarToken, soloRoles('admin'),
   upload.single('imagen'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se envió ninguna imagen' });
-    const imagen_url = `/uploads/${req.file.filename}`;
+   const imagen_url = req.file.path;
     const { rows } = await pool.query(
       'UPDATE productos SET imagen_url=$1 WHERE id=$2 RETURNING *',
       [imagen_url, req.params.id]
