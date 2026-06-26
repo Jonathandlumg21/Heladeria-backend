@@ -28,7 +28,7 @@ router.get('/pos/disponibles', verificarToken, async (req, res) => {
         c.nombre AS categoria,
         CASE
           WHEN p.tipo = 'simple' THEN p.stock
-          ELSE COALESCE(FLOOR(MIN(ing.stock / r.cantidad))::int, 0)
+          ELSE COALESCE(FLOOR(MIN(ing.stock / NULLIF(r.cantidad, 0)))::int, 0)
         END AS unidades_disponibles,
         CASE
           WHEN p.tipo = 'compuesto' THEN (
@@ -47,9 +47,6 @@ router.get('/pos/disponibles', verificarToken, async (req, res) => {
       LEFT JOIN categorias c  ON c.id = p.categoria_id
       WHERE p.activo = true
       GROUP BY p.id, p.nombre, p.imagen_url, p.precio, p.tipo, p.stock, c.nombre
-      HAVING
-        (p.tipo = 'simple' AND p.stock > 0)
-        OR (p.tipo = 'compuesto' AND COALESCE(FLOOR(MIN(ing.stock / r.cantidad)), 0) > 0)
       ORDER BY c.nombre, p.nombre
     `);
     res.json(rows);
