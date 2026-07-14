@@ -134,7 +134,7 @@ router.get('/productos-mas-vendidos', verificarToken, soloRoles('admin'), async 
 });
 
 // GET /api/dashboard/ventas-por-metodo?periodo=dia|semana|mes|año
-router.get('/ventas-por-metodo', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/ventas-por-metodo', verificarToken, soloRoles('admin', 'vendedor'), async (req, res) => {
   const { periodo = 'dia' } = req.query;
 
   const filtros = {
