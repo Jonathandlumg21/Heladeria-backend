@@ -67,13 +67,17 @@ router.get('/stock-bajo', verificarToken, soloRoles('admin', 'bodeguero'), async
   try {
     const { rows } = await pool.query(`
       SELECT
-        id, nombre, categoria, stock, stock_minimo, unidad, imagen_url,
-        (stock_minimo - stock) AS faltante
+        id, nombre, categoria, tipo, stock, stock_minimo, unidad, imagen_url,
+        GREATEST(stock_minimo - stock, 0) AS faltante
       FROM productos
-      WHERE stock <= stock_minimo
-        AND activo = true
+      WHERE activo = true
+        AND tipo != 'compuesto'
         AND (categoria IS NULL OR categoria != 'Especialidades')
-      ORDER BY faltante DESC
+        AND (
+          stock = 0
+          OR (stock_minimo IS NOT NULL AND stock_minimo > 0 AND stock < stock_minimo)
+        )
+      ORDER BY stock ASC, faltante DESC
     `);
     res.json(rows);
   } catch (err) {
