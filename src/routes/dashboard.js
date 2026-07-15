@@ -3,7 +3,7 @@ const pool   = require('../config/db');
 const { verificarToken, soloRoles } = require('../middlewares/auth');
 
 // GET /api/dashboard/ventas-diarias — últimos 30 días
-router.get('/ventas-diarias', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/ventas-diarias', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -25,7 +25,7 @@ router.get('/ventas-diarias', verificarToken, soloRoles('admin'), async (req, re
 });
 
 // GET /api/dashboard/ventas-mensuales — año actual
-router.get('/ventas-mensuales', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/ventas-mensuales', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -45,7 +45,7 @@ router.get('/ventas-mensuales', verificarToken, soloRoles('admin'), async (req, 
 });
 
 // GET /api/dashboard/ventas-anuales — todos los años
-router.get('/ventas-anuales', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/ventas-anuales', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -63,7 +63,7 @@ router.get('/ventas-anuales', verificarToken, soloRoles('admin'), async (req, re
 });
 
 // GET /api/dashboard/stock-bajo — productos bajo el mínimo
-router.get('/stock-bajo', verificarToken, soloRoles('admin', 'bodeguero'), async (req, res) => {
+router.get('/stock-bajo', verificarToken, soloRoles('admin', 'bodeguero', 'propietario'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -86,7 +86,7 @@ router.get('/stock-bajo', verificarToken, soloRoles('admin', 'bodeguero'), async
 });
 
 // GET /api/dashboard/resumen — tarjetas del dashboard
-router.get('/resumen', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/resumen', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
   try {
     const hoy = await pool.query(`
       SELECT COALESCE(SUM(total),0)::numeric AS total, COUNT(*)::int AS cantidad
@@ -118,7 +118,7 @@ router.get('/resumen', verificarToken, soloRoles('admin'), async (req, res) => {
 });
 
 // GET /api/dashboard/productos-mas-vendidos — top 10 del mes
-router.get('/productos-mas-vendidos', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/productos-mas-vendidos', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -140,7 +140,7 @@ router.get('/productos-mas-vendidos', verificarToken, soloRoles('admin'), async 
 });
 
 // GET /api/dashboard/ventas-por-metodo?periodo=dia|semana|mes|año
-router.get('/ventas-por-metodo', verificarToken, soloRoles('admin', 'vendedor'), async (req, res) => {
+router.get('/ventas-por-metodo', verificarToken, soloRoles('admin', 'vendedor', 'propietario'), async (req, res) => {
   const { periodo = 'dia' } = req.query;
 
   const filtros = {

@@ -60,7 +60,7 @@ router.post('/', verificarToken, soloRoles('admin'), async (req, res) => {
     if (!nombre || !email || !password || !rol) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
-    if (!['admin', 'vendedor', 'bodeguero'].includes(rol)) {
+    if (!['admin', 'vendedor', 'bodeguero', 'propietario'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
 
