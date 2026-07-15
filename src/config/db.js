@@ -6,7 +6,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }, // requerido para Supabase
 });
 
-pool.on('connect', () => {
+pool.on('connect', (client) => {
+  client.query("SET timezone = 'America/Guatemala'");
   console.log('Conectado a Supabase PostgreSQL');
 });
 
