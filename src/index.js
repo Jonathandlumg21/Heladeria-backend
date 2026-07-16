@@ -24,6 +24,7 @@ app.use('/api/ventas',     require('./routes/ventas'));
 app.use('/api/inventario', require('./routes/inventario'));
 app.use('/api/usuarios',   require('./routes/usuarios'));
 app.use('/api/dashboard',  require('./routes/dashboard'));
+app.use('/api/reportes',   require('./routes/reportes'));
 
 app.get('/api/health', (req, res) =>
   res.json({ ok: true, timestamp: new Date() })
