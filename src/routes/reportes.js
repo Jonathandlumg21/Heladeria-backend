@@ -2,32 +2,32 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 const { verificarToken, soloRoles } = require('../middlewares/auth');
 
-// GET /api/reportes/stock — todos los productos con su estado de stock
+// GET /api/reportes/stock — productos con bajo stock o sin stock
 router.get('/stock', verificarToken, soloRoles('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        id, nombre, categoria, tipo, stock, stock_minimo, unidad,
+        p.id,
+        p.nombre,
+        p.categoria,
+        p.stock,
+        p.stock_minimo,
+        p.unidad,
         CASE
-          WHEN stock = 0 THEN 'sin_stock'
-          WHEN stock_minimo IS NOT NULL AND stock_minimo > 0 AND stock < stock_minimo THEN 'bajo_stock'
+          WHEN p.stock = 0 THEN 'sin_stock'
+          WHEN p.stock_minimo IS NOT NULL
+            AND p.stock_minimo > 0
+            AND p.stock < p.stock_minimo THEN 'bajo_stock'
           ELSE 'ok'
         END AS estado,
-        GREATEST(COALESCE(stock_minimo, 0) - stock, 0) AS faltante
-      FROM productos
-      WHERE activo = true
-        AND tipo != 'compuesto'
-        AND (categoria IS NULL OR categoria != 'Especialidades')
-      ORDER BY
-        CASE
-          WHEN stock = 0 THEN 0
-          WHEN stock_minimo IS NOT NULL AND stock < stock_minimo THEN 1
-          ELSE 2
-        END,
-        nombre ASC
+        GREATEST(COALESCE(p.stock_minimo, 0) - p.stock, 0) AS faltante
+      FROM productos p
+      WHERE p.activo = true
+      ORDER BY p.stock ASC, p.nombre ASC
     `);
     res.json(rows);
   } catch (err) {
+    console.error('[/reportes/stock]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
