@@ -24,7 +24,7 @@ router.get('/stock', verificarToken, soloRoles('admin'), async (req, res) => {
       FROM productos p
       LEFT JOIN categorias c ON c.id = p.categoria_id
       WHERE p.activo = true
-        AND (c.nombre IS NULL OR c.nombre != 'Especialidades')
+        AND (c.nombre IS NULL OR c.nombre NOT IN ('Especialidades', 'Extras'))
       ORDER BY p.stock ASC, p.nombre ASC
     `);
     res.json(rows);
