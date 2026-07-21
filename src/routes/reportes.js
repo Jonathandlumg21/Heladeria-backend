@@ -9,7 +9,7 @@ router.get('/stock', verificarToken, soloRoles('admin'), async (req, res) => {
       SELECT
         p.id,
         p.nombre,
-        p.categoria,
+        c.nombre AS categoria,
         p.stock,
         p.stock_minimo,
         p.unidad,
@@ -22,6 +22,7 @@ router.get('/stock', verificarToken, soloRoles('admin'), async (req, res) => {
         END AS estado,
         GREATEST(COALESCE(p.stock_minimo, 0) - p.stock, 0) AS faltante
       FROM productos p
+      LEFT JOIN categorias c ON c.id = p.categoria_id
       WHERE p.activo = true
       ORDER BY p.stock ASC, p.nombre ASC
     `);
