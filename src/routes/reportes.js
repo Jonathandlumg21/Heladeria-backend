@@ -3,7 +3,7 @@ const pool   = require('../config/db');
 const { verificarToken, soloRoles } = require('../middlewares/auth');
 
 // GET /api/reportes/stock — productos con bajo stock o sin stock
-router.get('/stock', verificarToken, soloRoles('admin'), async (req, res) => {
+router.get('/stock', verificarToken, soloRoles('admin', 'bodeguero'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
