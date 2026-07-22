@@ -12,7 +12,7 @@ router.get('/hoy', verificarToken, soloRoles('admin', 'vendedor'), async (req, r
       SELECT c.*, u.nombre AS usuario
       FROM compras c
       JOIN usuarios u ON u.id = c.usuario_id
-      WHERE DATE(c.fecha AT TIME ZONE 'America/Guatemala') = CURRENT_DATE
+      WHERE DATE(c.fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
       ORDER BY c.fecha DESC
     `)
     res.json(rows)
@@ -70,14 +70,14 @@ router.get('/resumen-hoy', verificarToken, soloRoles('admin', 'vendedor'), async
         COALESCE(SUM(CASE WHEN metodo_pago='fri'      THEN total ELSE 0 END), 0)::numeric AS fri,
         COUNT(*)::int                                                                  AS cantidad_ventas
       FROM ventas
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = CURRENT_DATE
+      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
     `)
 
     // Compras de hoy
     const { rows: [compras] } = await pool.query(`
       SELECT COALESCE(SUM(monto), 0)::numeric AS total_compras
       FROM compras
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = CURRENT_DATE
+      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
     `)
 
     const efectivo_neto = parseFloat(ventas.efectivo) - parseFloat(compras.total_compras)
@@ -120,13 +120,13 @@ router.post('/cierre', verificarToken, soloRoles('admin', 'vendedor'), async (re
         COALESCE(SUM(CASE WHEN metodo_pago='fri'      THEN total ELSE 0 END), 0)::numeric AS fri,
         COUNT(*)::int AS cantidad_ventas
       FROM ventas
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = CURRENT_DATE
+      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
     `)
 
     const { rows: [compras] } = await pool.query(`
       SELECT COALESCE(SUM(monto), 0)::numeric AS total_compras
       FROM compras
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = CURRENT_DATE
+      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
     `)
 
     const efectivo_neto = parseFloat(ventas.efectivo) - parseFloat(compras.total_compras)
