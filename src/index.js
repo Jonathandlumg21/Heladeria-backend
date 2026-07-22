@@ -16,7 +16,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Rutas (las iremos agregando en el Paso 5)
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/productos',  require('./routes/productos'));
 app.use('/api/recetas',    require('./routes/recetas'));
@@ -25,6 +24,7 @@ app.use('/api/inventario', require('./routes/inventario'));
 app.use('/api/usuarios',   require('./routes/usuarios'));
 app.use('/api/dashboard',  require('./routes/dashboard'));
 app.use('/api/reportes',   require('./routes/reportes'));
+app.use('/api/compras',    require('./routes/compras'));
 
 app.get('/api/health', (req, res) =>
   res.json({ ok: true, timestamp: new Date() })
