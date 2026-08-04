@@ -106,6 +106,27 @@ router.post('/', verificarToken, soloRoles('admin', 'vendedor'), async (req, res
   }
 });
 
+// GET /api/ventas/recientes — últimas 10 ventas (admin y vendedor)
+router.get('/recientes', verificarToken, soloRoles('admin', 'vendedor'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        v.id, v.total, v.metodo_pago, v.fecha,
+        u.nombre AS vendedor,
+        COUNT(dv.id)::int AS num_items
+      FROM ventas v
+      JOIN usuarios u ON u.id = v.usuario_id
+      JOIN detalle_ventas dv ON dv.venta_id = v.id
+      GROUP BY v.id, u.nombre
+      ORDER BY v.fecha DESC
+      LIMIT 10
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/ventas — listar ventas recientes (solo admin)
 router.get('/', verificarToken, soloRoles('admin'), async (req, res) => {
   try {
