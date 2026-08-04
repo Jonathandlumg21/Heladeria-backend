@@ -55,13 +55,12 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
     }
 
     // Construir items para QAPI
-    // Pequeño contribuyente NO cobra IVA por separado
-    // El precio ya incluye el impuesto — se manda como está
+    // Pequeño contribuyente: no cobra IVA por separado.
+    // QAPI exige monto_gravable=0 y monto_impuesto=0 para tipo_dte FPEQ.
     const items = detalle.map(item => {
     const precioUnitario = parseFloat(item.precio_unitario)
     const cantidad       = item.cantidad
     const descuento      = 0
-    const montoGravable  = parseFloat((precioUnitario * cantidad - descuento).toFixed(2))
 
     return {
         tipo:            'B',
@@ -73,7 +72,7 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
         impuestos: [{
             nombre:                 'IVA',
             codigo_unidad_gravable: 1,
-            monto_gravable:         montoGravable,
+            monto_gravable:         0,
             monto_impuesto:         0,
             }],
          }
@@ -86,7 +85,7 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
 
     // Payload completo para QAPI
     const payload = {
-      tipo_dte:      'FACT',
+      tipo_dte:      'FPEQ',
       moneda:        'GTQ',
       fecha_emision: fechaEmision,
       emisor:        EMISOR,
