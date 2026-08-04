@@ -60,6 +60,8 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
     const items = detalle.map(item => {
       const precioUnitario = parseFloat(item.precio_unitario)
       const montoTotal     = parseFloat((precioUnitario * item.cantidad).toFixed(2))
+      const montoGravable  = parseFloat((montoTotal / 1.12).toFixed(2))
+      const montoImpuesto  = parseFloat((montoTotal - montoGravable).toFixed(2))
       return {
         tipo:            'B',
         cantidad:         item.cantidad,
@@ -70,8 +72,8 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
         impuestos: [{
           nombre:                 'IVA',
           codigo_unidad_gravable: 1,
-          monto_gravable:         montoTotal,
-          monto_impuesto:         0, // PEQ no desglosa IVA
+          monto_gravable:         montoGravable,
+          monto_impuesto:         montoImpuesto,
         }],
       }
     })
