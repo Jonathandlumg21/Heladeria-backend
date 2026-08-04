@@ -58,24 +58,25 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
     // Pequeño contribuyente NO cobra IVA por separado
     // El precio ya incluye el impuesto — se manda como está
     const items = detalle.map(item => {
-      const precioUnitario = parseFloat(item.precio_unitario)
-      const montoTotal     = parseFloat((precioUnitario * item.cantidad).toFixed(2))
-      const montoGravable  = parseFloat((montoTotal / 1.12).toFixed(2))
-      const montoImpuesto  = parseFloat((montoTotal - montoGravable).toFixed(2))
-      return {
+    const precioUnitario = parseFloat(item.precio_unitario)
+    const cantidad       = item.cantidad
+    const descuento      = 0
+    const montoGravable  = parseFloat((precioUnitario * cantidad - descuento).toFixed(2))
+
+    return {
         tipo:            'B',
-        cantidad:         item.cantidad,
+        cantidad,
         unidad_medida:   'UND',
         descripcion:      item.nombre,
         precio_unitario:  precioUnitario,
-        descuento:        0,
+        descuento,
         impuestos: [{
-          nombre:                 'IVA',
-          codigo_unidad_gravable: 1,
-          monto_gravable:         montoGravable,
-          monto_impuesto:         montoImpuesto,
-        }],
-      }
+            nombre:                 'IVA',
+            codigo_unidad_gravable: 1,
+            monto_gravable:         montoGravable,
+            monto_impuesto:         0,
+            }],
+         }
     })
 
     // Fecha en zona horaria de Guatemala UTC-6
@@ -90,7 +91,7 @@ router.post('/facturar/:venta_id', verificarToken, soloRoles('admin', 'vendedor'
       fecha_emision: fechaEmision,
       emisor:        EMISOR,
       receptor,
-      frases: [{ tipo_frase: 1, codigo_escenario: 1 }],
+      frases: [{ tipo_frase: 1, codigo_escenario: 2 }],
       items,
       metadata: { referencia_interna: `VENTA-${req.params.venta_id}` },
     }
