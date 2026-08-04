@@ -9,6 +9,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://heladeria-frontend-murex.vercel.app',
+    'https://www.saritadoblevia.com',
+    'https://saritadoblevia.com',
   ],
   credentials: true,
 }));
