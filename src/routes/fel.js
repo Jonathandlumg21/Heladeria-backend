@@ -209,4 +209,37 @@ router.get('/factura/:invoice_id', verificarToken, async (req, res) => {
   }
 })
 
+// ─────────────────────────────────────────
+// GET /api/fel/pdf/:venta_id
+// Descarga el PDF de la factura vía QAPI (GET /v1/invoices/{id}/pdf),
+// que sigue el redirect al certificador real y evita usar pdf_url directamente.
+// ─────────────────────────────────────────
+router.get('/pdf/:venta_id', verificarToken, async (req, res) => {
+  try {
+    const { rows: [venta] } = await pool.query(
+      'SELECT qapi_invoice_id FROM ventas WHERE id=$1',
+      [req.params.venta_id]
+    )
+
+    if (!venta?.qapi_invoice_id) {
+      return res.status(404).json({ error: 'Esta venta no tiene una factura FEL generada' })
+    }
+
+    const qapiRes = await fetch(`${QAPI_BASE}/invoices/${venta.qapi_invoice_id}/pdf`, {
+      headers: { Authorization: `Bearer ${QAPI_KEY}` },
+    })
+
+    if (!qapiRes.ok) {
+      const errData = await qapiRes.json().catch(() => ({}))
+      return res.status(qapiRes.status).json({ error: errData })
+    }
+
+    const buffer = Buffer.from(await qapiRes.arrayBuffer())
+    res.setHeader('Content-Type', qapiRes.headers.get('content-type') || 'application/pdf')
+    res.send(buffer)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router
