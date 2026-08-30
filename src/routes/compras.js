@@ -64,13 +64,25 @@ router.get('/resumen-hoy', verificarToken, soloRoles('admin', 'vendedor'), async
     // Ventas de hoy
     const { rows: [ventas] } = await pool.query(`
       SELECT
-        COALESCE(SUM(total), 0)::numeric                                              AS total_ventas,
-        COALESCE(SUM(CASE WHEN metodo_pago='efectivo' THEN total ELSE 0 END), 0)::numeric AS efectivo,
-        COALESCE(SUM(CASE WHEN metodo_pago='tarjeta'  THEN total ELSE 0 END), 0)::numeric AS tarjeta,
-        COALESCE(SUM(CASE WHEN metodo_pago='fri'      THEN total ELSE 0 END), 0)::numeric AS fri,
-        COUNT(*)::int                                                                  AS cantidad_ventas
-      FROM ventas
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+        COALESCE(d.total_ventas, 0)::numeric    AS total_ventas,
+        COALESCE(m.efectivo, 0)::numeric         AS efectivo,
+        COALESCE(m.tarjeta, 0)::numeric          AS tarjeta,
+        COALESCE(m.fri, 0)::numeric              AS fri,
+        COALESCE(d.cantidad_ventas, 0)::int      AS cantidad_ventas
+      FROM (
+        SELECT SUM(total)::numeric AS total_ventas, COUNT(*)::int AS cantidad_ventas
+        FROM ventas
+        WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+      ) d
+      LEFT JOIN (
+        SELECT
+          SUM(CASE WHEN vp.metodo_pago='efectivo' THEN vp.monto ELSE 0 END)::numeric AS efectivo,
+          SUM(CASE WHEN vp.metodo_pago='tarjeta'  THEN vp.monto ELSE 0 END)::numeric AS tarjeta,
+          SUM(CASE WHEN vp.metodo_pago='fri'      THEN vp.monto ELSE 0 END)::numeric AS fri
+        FROM venta_pagos vp
+        JOIN ventas v ON v.id = vp.venta_id
+        WHERE DATE(v.fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+      ) m ON true
     `)
 
     // Compras de hoy
@@ -114,13 +126,25 @@ router.post('/cierre', verificarToken, soloRoles('admin', 'vendedor'), async (re
     // Calcular totales
     const { rows: [ventas] } = await pool.query(`
       SELECT
-        COALESCE(SUM(total), 0)::numeric AS total_ventas,
-        COALESCE(SUM(CASE WHEN metodo_pago='efectivo' THEN total ELSE 0 END), 0)::numeric AS efectivo,
-        COALESCE(SUM(CASE WHEN metodo_pago='tarjeta'  THEN total ELSE 0 END), 0)::numeric AS tarjeta,
-        COALESCE(SUM(CASE WHEN metodo_pago='fri'      THEN total ELSE 0 END), 0)::numeric AS fri,
-        COUNT(*)::int AS cantidad_ventas
-      FROM ventas
-      WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+        COALESCE(d.total_ventas, 0)::numeric    AS total_ventas,
+        COALESCE(m.efectivo, 0)::numeric         AS efectivo,
+        COALESCE(m.tarjeta, 0)::numeric          AS tarjeta,
+        COALESCE(m.fri, 0)::numeric              AS fri,
+        COALESCE(d.cantidad_ventas, 0)::int      AS cantidad_ventas
+      FROM (
+        SELECT SUM(total)::numeric AS total_ventas, COUNT(*)::int AS cantidad_ventas
+        FROM ventas
+        WHERE DATE(fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+      ) d
+      LEFT JOIN (
+        SELECT
+          SUM(CASE WHEN vp.metodo_pago='efectivo' THEN vp.monto ELSE 0 END)::numeric AS efectivo,
+          SUM(CASE WHEN vp.metodo_pago='tarjeta'  THEN vp.monto ELSE 0 END)::numeric AS tarjeta,
+          SUM(CASE WHEN vp.metodo_pago='fri'      THEN vp.monto ELSE 0 END)::numeric AS fri
+        FROM venta_pagos vp
+        JOIN ventas v ON v.id = vp.venta_id
+        WHERE DATE(v.fecha AT TIME ZONE 'America/Guatemala') = (NOW() AT TIME ZONE 'America/Guatemala')::date
+      ) m ON true
     `)
 
     const { rows: [compras] } = await pool.query(`

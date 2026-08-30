@@ -90,6 +90,21 @@ async function setup() {
       )
     `);
 
+    // Permitir 'mixto' en ventas.metodo_pago (pago dividido entre varios métodos).
+    // metodo_pago es un ENUM nativo de Postgres (tipo "metodo_pago"), no un VARCHAR+CHECK.
+    await client.query(`
+      ALTER TYPE metodo_pago ADD VALUE IF NOT EXISTS 'mixto'
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS venta_pagos (
+        id          SERIAL PRIMARY KEY,
+        venta_id    INT NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+        metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('efectivo','tarjeta','fri')),
+        monto       NUMERIC(10,2) NOT NULL CHECK (monto > 0)
+      )
+    `);
+
     console.log('Tablas creadas.');
 
     // Crear usuario admin si no existe

@@ -7,16 +7,28 @@ router.get('/ventas-diarias', verificarToken, soloRoles('admin', 'propietario'),
   try {
     const { rows } = await pool.query(`
       SELECT
-        DATE(fecha)          AS dia,
-        SUM(total)::numeric  AS total,
-        COUNT(*)::int        AS cantidad,
-        SUM(CASE WHEN metodo_pago='efectivo' THEN total ELSE 0 END)::numeric AS efectivo,
-        SUM(CASE WHEN metodo_pago='tarjeta'  THEN total ELSE 0 END)::numeric AS tarjeta,
-        SUM(CASE WHEN metodo_pago='fri'      THEN total ELSE 0 END)::numeric AS fri
-      FROM ventas
-      WHERE fecha >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(fecha)
-      ORDER BY dia
+        d.dia, d.total, d.cantidad,
+        COALESCE(m.efectivo, 0)::numeric AS efectivo,
+        COALESCE(m.tarjeta,  0)::numeric AS tarjeta,
+        COALESCE(m.fri,      0)::numeric AS fri
+      FROM (
+        SELECT DATE(fecha) AS dia, SUM(total)::numeric AS total, COUNT(*)::int AS cantidad
+        FROM ventas
+        WHERE fecha >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(fecha)
+      ) d
+      LEFT JOIN (
+        SELECT
+          DATE(v.fecha) AS dia,
+          SUM(CASE WHEN vp.metodo_pago='efectivo' THEN vp.monto ELSE 0 END)::numeric AS efectivo,
+          SUM(CASE WHEN vp.metodo_pago='tarjeta'  THEN vp.monto ELSE 0 END)::numeric AS tarjeta,
+          SUM(CASE WHEN vp.metodo_pago='fri'      THEN vp.monto ELSE 0 END)::numeric AS fri
+        FROM venta_pagos vp
+        JOIN ventas v ON v.id = vp.venta_id
+        WHERE v.fecha >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(v.fecha)
+      ) m ON m.dia = d.dia
+      ORDER BY d.dia
     `);
     res.json(rows);
   } catch (err) {
@@ -144,10 +156,10 @@ router.get('/ventas-por-metodo', verificarToken, soloRoles('admin', 'vendedor', 
   const { periodo = 'dia' } = req.query;
 
   const filtros = {
-    dia:    `DATE(fecha) = CURRENT_DATE`,
-    semana: `fecha >= DATE_TRUNC('week',  NOW())`,
-    mes:    `fecha >= DATE_TRUNC('month', NOW())`,
-    año:    `fecha >= DATE_TRUNC('year',  NOW())`,
+    dia:    `DATE(v.fecha) = CURRENT_DATE`,
+    semana: `v.fecha >= DATE_TRUNC('week',  NOW())`,
+    mes:    `v.fecha >= DATE_TRUNC('month', NOW())`,
+    año:    `v.fecha >= DATE_TRUNC('year',  NOW())`,
   };
 
   const where = filtros[periodo] || filtros['dia'];
@@ -155,13 +167,14 @@ router.get('/ventas-por-metodo', verificarToken, soloRoles('admin', 'vendedor', 
   try {
     const { rows } = await pool.query(`
       SELECT
-        metodo_pago                   AS metodo,
-        COALESCE(SUM(total), 0)::numeric AS total,
-        COUNT(*)::int                 AS cantidad
-      FROM ventas
+        vp.metodo_pago                      AS metodo,
+        COALESCE(SUM(vp.monto), 0)::numeric AS total,
+        COUNT(*)::int                       AS cantidad
+      FROM venta_pagos vp
+      JOIN ventas v ON v.id = vp.venta_id
       WHERE ${where}
-      GROUP BY metodo_pago
-      ORDER BY metodo_pago
+      GROUP BY vp.metodo_pago
+      ORDER BY vp.metodo_pago
     `);
     res.json(rows);
   } catch (err) {

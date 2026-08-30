@@ -4,12 +4,28 @@ const { verificarToken, soloRoles } = require('../middlewares/auth');
 
 // POST /api/ventas — registrar una nueva venta
 router.post('/', verificarToken, soloRoles('admin', 'vendedor'), async (req, res) => {
-  const { items, metodo_pago } = req.body;
+  const { items, metodo_pago, pagos } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Debe incluir al menos un producto' });
   }
-  if (!['efectivo', 'tarjeta', 'fri'].includes(metodo_pago)) {
+
+  // Pago dividido: valida la lista de pagos en vez del metodo_pago único
+  let pagosValidados = null;
+  if (pagos) {
+    if (!Array.isArray(pagos) || pagos.length === 0) {
+      return res.status(400).json({ error: 'La lista de pagos es inválida' });
+    }
+    for (const p of pagos) {
+      if (!['efectivo', 'tarjeta', 'fri'].includes(p.metodo_pago)) {
+        return res.status(400).json({ error: `Método de pago inválido: ${p.metodo_pago}` });
+      }
+      if (!(parseFloat(p.monto) > 0)) {
+        return res.status(400).json({ error: 'Cada pago debe tener un monto mayor a 0' });
+      }
+    }
+    pagosValidados = pagos.map(p => ({ metodo_pago: p.metodo_pago, monto: parseFloat(p.monto) }));
+  } else if (!['efectivo', 'tarjeta', 'fri'].includes(metodo_pago)) {
     return res.status(400).json({ error: 'Método de pago inválido' });
   }
 
@@ -61,11 +77,33 @@ router.post('/', verificarToken, soloRoles('admin', 'vendedor'), async (req, res
 
     const total = items.reduce((s, i) => s + i.cantidad * parseFloat(i.precio_unitario), 0);
 
+    if (pagosValidados) {
+      const sumaPagos = pagosValidados.reduce((s, p) => s + p.monto, 0);
+      if (Math.abs(sumaPagos - total) > 0.01) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `La suma de los pagos (Q${sumaPagos.toFixed(2)}) no coincide con el total (Q${total.toFixed(2)})`,
+        });
+      }
+    }
+
+    const metodoGuardado = pagosValidados
+      ? (pagosValidados.length > 1 ? 'mixto' : pagosValidados[0].metodo_pago)
+      : metodo_pago;
+
     const { rows } = await client.query(
       'INSERT INTO ventas (usuario_id, total, metodo_pago) VALUES ($1,$2,$3) RETURNING id',
-      [req.usuario.id, total.toFixed(2), metodo_pago]
+      [req.usuario.id, total.toFixed(2), metodoGuardado]
     );
     const venta_id = rows[0].id;
+
+    const pagosAGuardar = pagosValidados || [{ metodo_pago, monto: total }];
+    for (const p of pagosAGuardar) {
+      await client.query(
+        'INSERT INTO venta_pagos (venta_id, metodo_pago, monto) VALUES ($1,$2,$3)',
+        [venta_id, p.metodo_pago, p.monto.toFixed(2)]
+      );
+    }
 
     for (const item of items) {
       await client.query(
@@ -113,7 +151,11 @@ router.get('/recientes', verificarToken, soloRoles('admin', 'vendedor'), async (
       SELECT
         v.id, v.total, v.metodo_pago, v.fecha,
         u.nombre AS vendedor,
-        COUNT(dv.id)::int AS num_items
+        COUNT(dv.id)::int AS num_items,
+        COALESCE((
+          SELECT json_agg(json_build_object('metodo_pago', vp.metodo_pago, 'monto', vp.monto))
+          FROM venta_pagos vp WHERE vp.venta_id = v.id
+        ), '[]') AS pagos
       FROM ventas v
       JOIN usuarios u ON u.id = v.usuario_id
       JOIN detalle_ventas dv ON dv.venta_id = v.id
@@ -131,7 +173,11 @@ router.get('/recientes', verificarToken, soloRoles('admin', 'vendedor'), async (
 router.get('/', verificarToken, soloRoles('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT v.*, u.nombre AS vendedor
+      SELECT v.*, u.nombre AS vendedor,
+        COALESCE((
+          SELECT json_agg(json_build_object('metodo_pago', vp.metodo_pago, 'monto', vp.monto))
+          FROM venta_pagos vp WHERE vp.venta_id = v.id
+        ), '[]') AS pagos
       FROM ventas v
       JOIN usuarios u ON u.id = v.usuario_id
       ORDER BY v.fecha DESC
@@ -148,7 +194,7 @@ router.get('/reporte', verificarToken, soloRoles('admin'), async (req, res) => {
   const { desde, hasta, metodo } = req.query;
   const params = [desde || '2000-01-01', hasta || new Date().toISOString().slice(0,10)];
   let metodoFiltro = '';
-  if (metodo && ['efectivo','tarjeta','fri'].includes(metodo)) {
+  if (metodo && ['efectivo','tarjeta','fri','mixto'].includes(metodo)) {
     params.push(metodo);
     metodoFiltro = `AND v.metodo_pago = $${params.length}`;
   }
@@ -157,7 +203,11 @@ router.get('/reporte', verificarToken, soloRoles('admin'), async (req, res) => {
       SELECT
         v.id, v.fecha, v.total::numeric, v.metodo_pago,
         u.nombre AS vendedor,
-        (SELECT COUNT(*) FROM detalle_ventas dv WHERE dv.venta_id = v.id)::int AS num_items
+        (SELECT COUNT(*) FROM detalle_ventas dv WHERE dv.venta_id = v.id)::int AS num_items,
+        COALESCE((
+          SELECT json_agg(json_build_object('metodo_pago', vp.metodo_pago, 'monto', vp.monto))
+          FROM venta_pagos vp WHERE vp.venta_id = v.id
+        ), '[]') AS pagos
       FROM ventas v
       JOIN usuarios u ON u.id = v.usuario_id
       WHERE v.fecha::date >= $1::date
