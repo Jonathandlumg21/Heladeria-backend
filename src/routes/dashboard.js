@@ -126,9 +126,23 @@ router.get('/resumen', verificarToken, soloRoles('admin', 'propietario'), async 
         AND EXTRACT(YEAR  FROM fecha) = EXTRACT(YEAR  FROM (NOW() AT TIME ZONE 'America/Guatemala'))
     `);
 
+    // compras.fecha es TIMESTAMP sin zona y guarda la hora local de Guatemala
+    const compras = await pool.query(`
+      WITH h AS (SELECT (NOW() AT TIME ZONE 'America/Guatemala') AS ahora)
+      SELECT
+        COALESCE(SUM(c.monto) FILTER (WHERE c.fecha::date = h.ahora::date), 0)::numeric AS compras_hoy,
+        COALESCE(SUM(c.monto), 0)::numeric AS compras_mes,
+        COUNT(c.id)::int AS cantidad_mes
+      FROM h
+      LEFT JOIN compras c
+        ON c.fecha >= date_trunc('month', h.ahora)
+       AND c.fecha <  date_trunc('month', h.ahora) + interval '1 month'
+    `);
+
     const ventasMes    = parseFloat(mes.rows[0].total);
     const totalPedidos = parseFloat(gastos.rows[0].total_pedidos);
     const totalPagos   = parseFloat(gastos.rows[0].total_pagos);
+    const comprasMes   = parseFloat(compras.rows[0].compras_mes);
 
     res.json({
       ventas_hoy:           hoy.rows[0],
@@ -137,8 +151,35 @@ router.get('/resumen', verificarToken, soloRoles('admin', 'propietario'), async 
       total_productos:      productosActivos.rows[0].cantidad,
       gastos_pedidos_mes:   totalPedidos,
       gastos_pagos_mes:     totalPagos,
-      utilidad_neta_mes:    ventasMes - totalPedidos - totalPagos,
+      compras_hoy:          parseFloat(compras.rows[0].compras_hoy),
+      compras_mes:          comprasMes,
+      compras_cantidad_mes: compras.rows[0].cantidad_mes,
+      utilidad_neta_mes:    ventasMes - totalPedidos - totalPagos - comprasMes,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/dashboard/compras-diarias — ventas vs compras por día del mes actual (hora Guatemala)
+router.get('/compras-diarias', verificarToken, soloRoles('admin', 'propietario'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      WITH ahora AS (SELECT (NOW() AT TIME ZONE 'America/Guatemala') AS t),
+      dias AS (
+        SELECT d::date AS dia
+        FROM ahora, generate_series(date_trunc('month', ahora.t), ahora.t, interval '1 day') d
+      )
+      SELECT
+        dias.dia::text AS dia,
+        COALESCE((SELECT SUM(v.total) FROM ventas v
+                  WHERE DATE(v.fecha AT TIME ZONE 'America/Guatemala') = dias.dia), 0)::numeric AS ventas,
+        COALESCE((SELECT SUM(c.monto) FROM compras c WHERE c.fecha::date = dias.dia), 0)::numeric AS compras,
+        (SELECT COUNT(*) FROM compras c WHERE c.fecha::date = dias.dia)::int AS cantidad_compras
+      FROM dias
+      ORDER BY dias.dia
+    `);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
