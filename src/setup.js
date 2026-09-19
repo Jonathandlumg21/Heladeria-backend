@@ -90,6 +90,18 @@ async function setup() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gastos_negocio (
+        id          SERIAL PRIMARY KEY,
+        categoria   VARCHAR(20) NOT NULL CHECK (categoria IN ('pedido','pago_negocio')),
+        descripcion VARCHAR(200) NOT NULL,
+        monto       NUMERIC(10,2) NOT NULL CHECK (monto > 0),
+        usuario_id  INT NOT NULL REFERENCES usuarios(id),
+        fecha       DATE NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Guatemala')::date,
+        creado_en   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // Permitir 'mixto' en ventas.metodo_pago (pago dividido entre varios métodos).
     // metodo_pago es un ENUM nativo de Postgres (tipo "metodo_pago"), no un VARCHAR+CHECK.
     await client.query(`

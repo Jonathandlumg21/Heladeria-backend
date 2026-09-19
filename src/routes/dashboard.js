@@ -117,12 +117,27 @@ router.get('/resumen', verificarToken, soloRoles('admin', 'propietario'), async 
     const productosActivos = await pool.query(`
       SELECT COUNT(*)::int AS cantidad FROM productos WHERE activo = true
     `);
+    const gastos = await pool.query(`
+      SELECT
+        COALESCE(SUM(monto) FILTER (WHERE categoria = 'pedido'), 0)::numeric       AS total_pedidos,
+        COALESCE(SUM(monto) FILTER (WHERE categoria = 'pago_negocio'), 0)::numeric AS total_pagos
+      FROM gastos_negocio
+      WHERE EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM (NOW() AT TIME ZONE 'America/Guatemala'))
+        AND EXTRACT(YEAR  FROM fecha) = EXTRACT(YEAR  FROM (NOW() AT TIME ZONE 'America/Guatemala'))
+    `);
+
+    const ventasMes    = parseFloat(mes.rows[0].total);
+    const totalPedidos = parseFloat(gastos.rows[0].total_pedidos);
+    const totalPagos   = parseFloat(gastos.rows[0].total_pagos);
 
     res.json({
       ventas_hoy:           hoy.rows[0],
       ventas_mes:           mes.rows[0],
       productos_stock_bajo: stockBajo.rows[0].cantidad,
       total_productos:      productosActivos.rows[0].cantidad,
+      gastos_pedidos_mes:   totalPedidos,
+      gastos_pagos_mes:     totalPagos,
+      utilidad_neta_mes:    ventasMes - totalPedidos - totalPagos,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
