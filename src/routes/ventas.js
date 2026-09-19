@@ -2,6 +2,9 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 const { verificarToken, soloRoles } = require('../middlewares/auth');
 
+const hoyGuatemala = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+
 // POST /api/ventas — registrar una nueva venta
 router.post('/', verificarToken, soloRoles('admin', 'vendedor'), async (req, res) => {
   const { items, metodo_pago, pagos } = req.body;
@@ -192,7 +195,7 @@ router.get('/', verificarToken, soloRoles('admin'), async (req, res) => {
 // GET /api/ventas/reporte?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&metodo=
 router.get('/reporte', verificarToken, soloRoles('admin'), async (req, res) => {
   const { desde, hasta, metodo } = req.query;
-  const params = [desde || '2000-01-01', hasta || new Date().toISOString().slice(0,10)];
+  const params = [desde || '2000-01-01', hasta || hoyGuatemala()];
   let metodoFiltro = '';
   if (metodo && ['efectivo','tarjeta','fri','mixto'].includes(metodo)) {
     params.push(metodo);
